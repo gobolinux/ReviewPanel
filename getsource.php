@@ -24,7 +24,7 @@ while (false !== ($entry = $d->read())) {
 		$dir = basename($webroot);
 		if (is_link($dir))
 			$dir = readlink($dir);
-		system("tar --exclude reviewpanel.tar.bz2 --exclude files --exclude svn --exclude git --exclude '*~' -cjhvf $dir/reviewpanel.tar.bz2 $dir");
+		system("tar --exclude reviewpanel.tar.bz2 --exclude files --exclude git --exclude '*~' -cjhvf $dir/reviewpanel.tar.bz2 $dir");
 	}
 }
 

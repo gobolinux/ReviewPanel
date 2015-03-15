@@ -17,6 +17,7 @@ header("Content-type: text/html");
 extract(getmeta($_REQUEST['source']));
 $source = $_REQUEST['source'];
 $commenting = false;
+
 if (authorised()) {
 	if ($_POST['approve'] || $_POST['approve_and_close'])
 		$status = 'approve';
@@ -49,22 +50,19 @@ if (authorised()) {
 	if ('approve' == $status && !$_POST['approve-manual']) {
 		$pwd = getcwd();
 		echo "<pre>";
-		chdir("$recipesvn/trunk");
-		system("svn checkout $recipesvnserv/trunk/$program");
+		chdir("$recipegit/trunk");
+		system("git pull");
 		if (!file_exists("$program")) {
 			echo "This is a new program, creating directory...<br />";
-			system("svn -m 'Creating trunk program directory' " .
-			"mkdir --no-auth-cache --non-interactive " . 
-			"--username $SVN_USER --password $SVN_PASS " .
-			"$recipesvnserv/trunk/$program");
-			system("svn checkout $recipesvnserv/trunk/$program");
+			system("mkdir $program");
+			system("git add $program");
+			system("git commit -m 'Creating trunk program directory'");
 			system("cp -R " .
 				"$pwd/$recipedir/{$_REQUEST['source']}/$program/$version " .
-				"$recipesvn/trunk/$program");
-			system("svn add --force $program/*");
+				"$recipegit/trunk/$program");
+			system("git add $program");
 		} else {
 			chdir("$program");
-			system('svn up');
 			list($originver, $origenrev) = explode('-', $origin);
 			if ('none' == $originver) {
 				echo "It seems this program has been added to the tree " .
@@ -73,33 +71,20 @@ if (authorised()) {
 				"on the entry in trunk.";
 				exit();
 			}
-			if (!file_exists("$version")) {
-				echo "This version does not exist in trunk, copying from " .
-				"$originver and updating...<br />";
-				system("svn cp $originver $version");
-				system("find $version -name .svn -prune -o -type f -exec rm '{}' ';'");
-				system("cp -Rf " .
-					"$pwd/$recipedir/$source/$program/$version .");
-			} else {
-				system("find $version -name .svn -prune -o -type f -exec rm '{}' ';'");
-				system("cp -Rf $pwd/$recipedir/$source/$program/$version .");
-			}
-			system("svn st | awk '/!/ {print \$2}' | xargs svn rm");
-			system('svn add --force *');
+			system("cp -Rf $pwd/$recipedir/$source/$program/$version .");
+			system("git add $version");
 		}
 		
-		chdir("$recipesvn/revisions");
-		system("svn checkout $recipesvnserv/revisions/$program");
+		chdir("$recipegit/revisions");
+		system("git pull");
 		if (!file_exists("$program")) {
 			echo "Creating revisions/$program directory...<br />\n";
-			system("svn -m 'Creating revisions program directory' " .
-			"mkdir --no-auth-cache --non-interactive " . 
-			"--username $SVN_USER --password $SVN_PASS " .
-			"$recipesvnserv/revisions/$program");
+			system("mkdir $program");
+			system("git add $program");
+			system("git commit -m 'Creating revisions program directory'");
 			$nextrev = 1;
 		} else {
 			chdir($program);
-			system('svn up');
 			$nextrev = 1;
 			$d = dir(".");
 			while (false !== ($entry = $d->read())) {
@@ -111,30 +96,23 @@ if (authorised()) {
 			}
 		}
 		echo "Committing trunk of $program $version...<br />";
-		chdir("$recipesvn/trunk/$program");
+		chdir("$recipegit/trunk/$program");
 		
 		$submitter = preg_replace('/[^-a-zA-Z0-9 _]/', '', $submitter);
 		
-		#echo "pwd: " . getcwd() . "<br />\n";
-		#echo "svn commit --no-auth-cache --non-interactive --username ". 
-		#	"$SVN_USER --password $SVN_PASS -m " .
-		#	escapeshellarg("Recipe for $program $version submitted by " . 
-		#	"$submitter reviewed by " . username($_SESSION['email']) . 
-		#	" in the recipe review panel") . "<br />\n";
-		system("svn commit --no-auth-cache --non-interactive --username ". 
-			"$SVN_USER --password $SVN_PASS -m " .
+		system("git commit -m ". 
 			escapeshellarg("Recipe for $program $version submitted by " . 
 			"$submitter reviewed by " . username($_SESSION['email']) . 
 			" in the recipe review panel"));
 		
 		echo "Creating revision $program $version-r$nextrev...<br />";
 		
-		system("svn cp --no-auth-cache --non-interactive --username " . 
-			"$SVN_USER --password $SVN_PASS -m " .
-			escapeshellarg("Committing revision $nextrev of $program " . 
-			"$version") .
-			" $recipesvnserv/trunk/$program/$version " . 
-			"$recipesvnserv/revisions/$program/$version-r$nextrev");
+		system("cp -a $version $recipegit/revisions/$program/$version-r$nextrev");
+		chdir("$recipegit/revisions/$program");
+		system("git add $version-r$nextrev");
+		system("git commit -m ".
+			escapeshellarg("Committing revision $nextrev of $program $version"));
+		system("git push");
 		echo "Committed recipe to store.<br/>";
 		echo "</pre>";
 	} elseif ('reject' == $status) {

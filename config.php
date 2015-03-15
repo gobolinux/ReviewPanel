@@ -1,7 +1,7 @@
 <?php
 $recipedir = "files";
-$recipesvn = "/home/gobo_recipes/recipes.gobolinux.org/reviewpanel/svn";
-$recipesvnserv = "http://svn.gobolinux.org/recipes";
+$recipegit = "/home/gobo_recipes/recipes.gobolinux.org/reviewpanel/git";
+$recipegitserv = "https://github.com/gobolinux/Recipes";
 
 $host = "recipes.gobolinux.org";
 $webroot = "/review";
@@ -13,16 +13,11 @@ $replacementcolour = '#0c0';
 $replacedcolour = 'white';
 $replacementcolour = 'white';
 
-# Password is hidden here, that isn't exported.
-# It defines $SVN_USER and $SVN_PASS
-require 'svn/credentials.php';
-
 $users = array(
  'michael@gobolinux.org' => 'Michael Homer',
  'jonka750@student.liu.se' => 'Jonas Karlsson',
  'jonas@gobolinux.org' => 'Jonas Karlsson',
  'hisham.hm@gmail.com' => 'Hisham Muhammad',
- 'hisham@apple2.com' => 'Hisham Muhammad',
  'hisham@gobolinux.org' => 'Hisham Muhammad',
  'lucasvr@gobolinux.org' => 'Lucas C. Villa Real',
  'carlo@calica.com' => 'Carlo Calica',
