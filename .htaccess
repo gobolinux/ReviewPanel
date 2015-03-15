@@ -1,0 +1,31 @@
+RewriteEngine on
+
+# -- is preferred so it works with tools
+RewriteCond %{HTTP_ACCEPT} application/x-gobo-recipe
+RewriteRule ^([0-9]+-[0-9]+/[-a-z0-9_]+)/([^/]+)--([^/]+)$ /review/files/$1/$2--$3--recipe.tar.bz2 [L]
+
+RewriteRule ^([0-9]+-[0-9]+/[-a-z0-9_]+)/[^/]+--[^/]+$ index.php?mode=diff&source=$1 [L,QSA]
+RewriteRule ^([0-9]+-[0-9]+/[-a-z0-9_]+)/[^/]+--[^/]+/([^/]+)$ index.php?mode=$2&source=$1 [L,QSA]
+RewriteRule ^([0-9]+-[0-9]+/[-a-z0-9_]+)/[^/]+--[^/]+/edit/(.+)$ index.php?mode=edit&source=$1&file=$2 [L,QSA]
+
+# But / still works for backwards compatibility
+
+RewriteRule ^([0-9]+-[0-9]+/[-a-z0-9_]+)/[^/]+/[^/]+$ index.php?mode=diff&source=$1 [L,QSA]
+RewriteRule ^([0-9]+-[0-9]+/[-a-z0-9_]+)/[^/]+/[^/]+/([^/]+)$ index.php?mode=$2&source=$1 [L,QSA]
+RewriteRule ^([0-9]+-[0-9]+/[-a-z0-9_]+)/[^/]+/[^/]+/edit/(.+)$ index.php?mode=edit&source=$1&file=$2 [L,QSA]
+
+
+# Are these still used?
+RewriteRule ^([0-9]+-[0-9]+/[-a-z0-9_]+)/([^/]+?)$ index.php?mode=$2&source=$1 [QSA,L]
+RewriteRule ^([0-9]+-[0-9]+/[-a-z0-9_]+)/edit/(.+)$ index.php?mode=edit&source=$1&file=$2 [L,QSA]
+RewriteRule ^([0-9]+-[0-9]+/[-a-z0-9_]+)$ index.php?mode=diff&source=$1 [L,QSA]
+
+RewriteRule ^auth/([^/]+?)$ index.php?mode=auth&action=$1 [L,QSA]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^([^/]+)$ index.php?mode=$1 [L,QSA]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ index.php [L,QSA]
