@@ -19,6 +19,7 @@ $users = array(
  'jonas@gobolinux.org' => 'Jonas Karlsson',
  'hisham.hm@gmail.com' => 'Hisham Muhammad',
  'hisham@gobolinux.org' => 'Hisham Muhammad',
+ 'barrocas75@gmail.com' => 'Hugo Barrocas',
  'lucasvr@gobolinux.org' => 'Lucas C. Villa Real',
  'carlo@calica.com' => 'Carlo Calica',
  'detsch@gobolinux.org' => 'André Detsch',
