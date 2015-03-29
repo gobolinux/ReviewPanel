@@ -18,7 +18,122 @@ extract(getmeta($_REQUEST['source']));
 $source = $_REQUEST['source'];
 $commenting = false;
 
-if (authorised()) {
+require("Sajax.php");
+
+function log_system($command) {
+	global $logfile;
+	system("( $command ) 2>&1 >> $logfile");
+}
+
+function log_echo($str) {
+	global $logfile;
+	file_put_contents($logfile, $str, FILE_APPEND);
+}
+
+function refresh($src) {
+	global $recipedir, $source, $logfile;
+	error_reporting(E_ERROR);
+	if (!authorised()) {
+		return "Not authorised.";
+	}
+	$source = $src;
+	$pwd = getcwd();
+	$logfile = "$pwd/$recipedir/$source/upload_log";
+	$fd = fopen($logfile, "r");
+	if ($fd === false) {
+		return "Please wait...";
+	}
+	$out = "";
+	while (!feof($fd)) {
+		$out .= fread($fd, 1024);
+	}
+	fclose($fd);
+	return $out;
+}
+
+function upload($src) {
+	global $recipedir, $source, $recipegit, $program, $version;
+	global $submitter, $submitteremail, $origin, $logfile;
+	error_reporting(E_ERROR);
+	if (!authorised()) {
+		return;
+	}
+	$source = $src;
+	$pwd = getcwd();
+	$logfile = "$pwd/$recipedir/$source/upload_log";
+	system("rm -f $logfile &> /dev/null");
+	chdir("$recipegit/trunk");
+	log_system("git pull");
+	if (!file_exists("$program")) {
+		log_echo("This is a new program, creating directory...<br />");
+		log_system("mkdir $program");
+		log_system("git add $program");
+		log_system("git commit -m 'Creating trunk program directory'");
+		log_system("cp -R " .
+			"$pwd/$recipedir/$source/$program/$version " .
+			"$recipegit/trunk/$program");
+		log_system("git add $program");
+	} else {
+		chdir("$program");
+		list($originver, $origenrev) = explode('-', $origin);
+		if ('none' == $originver) {
+			log_echo("It seems this program has been added to the tree\n" .
+			"since this version was submitted. It will not be possible\n" .
+			"to commit this recipe. It must be submitted again based\n" .
+			"on the entry in trunk.");
+			return;
+		}
+		log_system("cp -Rf $pwd/$recipedir/$source/$program/$version .");
+		log_system("git add $version");
+	}
+	
+	chdir("$recipegit/revisions");
+	log_system("git pull");
+	if (!file_exists("$program")) {
+		log_echo("Creating revisions/$program directory...<br />\n");
+		log_system("mkdir $program");
+		log_system("git add $program");
+		log_system("git commit -m 'Creating revisions program directory'");
+		$nextrev = 1;
+	} else {
+		chdir($program);
+		$nextrev = 1;
+		$d = dir(".");
+		while (false !== ($entry = $d->read())) {
+			if (substr($entry, 0, strlen($version)) != $version)
+				continue;
+			list($junk, $rev) = explode('-r', $entry);
+			if ((0+$rev) >= ($nextrev))
+				$nextrev = 1+$rev;
+		}
+	}
+	log_echo("Committing trunk of $program $version...<br />");
+	chdir("$recipegit/trunk/$program");
+	
+	$submitter = preg_replace('/[^-a-zA-Z0-9 _]/', '', $submitter);
+	
+	log_echo("Creating revision $program $version-r$nextrev...<br />");
+	
+	log_system("cp -a $version $recipegit/revisions/$program/$version-r$nextrev");
+	chdir("$recipegit/revisions/$program");
+	log_system("git add $version-r$nextrev");
+	
+	log_system("git commit -m ". 
+		escapeshellarg("$program $version submitted by " . 
+		"$submitter reviewed by " . username($_SESSION['email']) . 
+		" in the recipe review panel")." --author ".
+		escapeshellarg("$submitter <$submitteremail>"));
+
+	log_system("git push");
+	log_echo("Committed recipe to store.<br/>");
+}
+
+sajax_init();
+sajax_export("refresh");
+sajax_export("upload");
+sajax_handle_client_request();
+
+function get_status() {
 	if ($_POST['approve'] || $_POST['approve_and_close'])
 		$status = 'approve';
 	elseif ($_POST['approve-manual'])
@@ -31,10 +146,16 @@ if (authorised()) {
 		$commenting = true;
 	elseif ($status != 'claimed' || $_POST['unclaim'])
 		$status = 'pending';
-	file_put_contents("$recipedir/{$_REQUEST['source']}/status", $status);
-	file_put_contents("$recipedir/{$_REQUEST['source']}/reviewer", 
+	return $status;
+}
+
+if (authorised()) {
+	$status = get_status();
+
+	file_put_contents("$recipedir/$source/status", $status);
+	file_put_contents("$recipedir/$source/reviewer", 
 		$_SESSION['email']);
-	file_put_contents("$recipedir/{$_REQUEST['source']}/message", 
+	file_put_contents("$recipedir/$source/message", 
 		$_POST['message']);
 	$msg = "You recently submitted a GoboLinux recipe for $program $version,".
 	       " which has now been reviewed by " . username($_SESSION['email']) .
@@ -48,73 +169,7 @@ if (authorised()) {
 			 	"<http://{$_SERVER['HTTP_HOST']}$url>";
 	}
 	if ('approve' == $status && !$_POST['approve-manual']) {
-		$pwd = getcwd();
-		echo "<pre>";
-		chdir("$recipegit/trunk");
-		system("git pull");
-		if (!file_exists("$program")) {
-			echo "This is a new program, creating directory...<br />";
-			system("mkdir $program");
-			system("git add $program");
-			system("git commit -m 'Creating trunk program directory'");
-			system("cp -R " .
-				"$pwd/$recipedir/{$_REQUEST['source']}/$program/$version " .
-				"$recipegit/trunk/$program");
-			system("git add $program");
-		} else {
-			chdir("$program");
-			list($originver, $origenrev) = explode('-', $origin);
-			if ('none' == $originver) {
-				echo "It seems this program has been added to the tree " .
-				"since this version was submitted. It will not be possible " .
-				"to commit this recipe. It must be submitted again based " .
-				"on the entry in trunk.";
-				exit();
-			}
-			system("cp -Rf $pwd/$recipedir/$source/$program/$version .");
-			system("git add $version");
-		}
-		
-		chdir("$recipegit/revisions");
-		system("git pull");
-		if (!file_exists("$program")) {
-			echo "Creating revisions/$program directory...<br />\n";
-			system("mkdir $program");
-			system("git add $program");
-			system("git commit -m 'Creating revisions program directory'");
-			$nextrev = 1;
-		} else {
-			chdir($program);
-			$nextrev = 1;
-			$d = dir(".");
-			while (false !== ($entry = $d->read())) {
-				if (substr($entry, 0, strlen($version)) != $version)
-					continue;
-				list($junk, $rev) = explode('-r', $entry);
-				if ((0+$rev) >= ($nextrev))
-					$nextrev = 1+$rev;
-			}
-		}
-		echo "Committing trunk of $program $version...<br />";
-		chdir("$recipegit/trunk/$program");
-		
-		$submitter = preg_replace('/[^-a-zA-Z0-9 _]/', '', $submitter);
-		
-		system("git commit -m ". 
-			escapeshellarg("Recipe for $program $version submitted by " . 
-			"$submitter reviewed by " . username($_SESSION['email']) . 
-			" in the recipe review panel"));
-		
-		echo "Creating revision $program $version-r$nextrev...<br />";
-		
-		system("cp -a $version $recipegit/revisions/$program/$version-r$nextrev");
-		chdir("$recipegit/revisions/$program");
-		system("git add $version-r$nextrev");
-		system("git commit -m ".
-			escapeshellarg("Committing revision $nextrev of $program $version"));
-		system("git push");
-		echo "Committed recipe to store.<br/>";
-		echo "</pre>";
+		//upload();
 	} elseif ('reject' == $status) {
 		$msg .= "The recipe you sent to GoboLinux for $program " .
 			"version $version was not accepted.\n\n" .
@@ -150,26 +205,62 @@ if (authorised()) {
 		);
 	}
 	
-	
-	header("Refresh: 10;url=$webroot");
+	//header("Refresh: 10;url=$webroot");
+
+	// ---------------------------------------------------
+	echo "The recipe has been marked: $status <br/>";
+
+	if ($status == 'approve') {
+		?>
+
+<h2 id="status">Uploading...</h2>
+<pre id="log">
+</pre>
+<script language="JavaScript" type="text/javascript">
+
+<?
+sajax_show_javascript();
 ?>
-The recipe has been marked: <?php echo $status?>
-<?php if ($_POST['approve_and_close']) {?>
-<script type="text/javascript">
-setTimeout(function() {window.close();}, 2000);
-window.close();
-</script>
-<?php
+
+var old_data = "";
+var dots = 3;
+var uploadDone = false;
+var statusObj = document.getElementById("status");
+
+function refresh_cb(new_data) {
+	if (new_data != old_data) {
+		document.getElementById("log").innerHTML = new_data;
+		old_data = new_data;
+	}
+	if (!uploadDone) {
+		statusObj.innerHTML = "Uploading" + (dots == 1 ? "." : (dots == 2 ? ".." : "..."));
+		dots++;
+		if (dots == 4) {
+			dots = 1;
+		}
+		setTimeout('x_refresh("<?php echo $source; ?>", refresh_cb)', 1000);
+	}
 }
-?>
-<?php
-if (false) {
-?><br />
-Note that you will still need to commit it manually. If you have not done
-this, you may <a href="<?php
-echo "$tarball"
-?>">download the tarball</a>, or run:<br /><code>PutRecipe <?php echo "http://{$_SERVER['HTTP_HOST']}$tarball"?></code>
-<?php
-} # if false
+
+function upload_cb() {
+	statusObj.innerHTML = "Uploaded!";
+	uploadDone = true;
+}
+refresh_cb("");
+x_upload("<?php echo $source; ?>", upload_cb);
+</script>
+
+		<?php
+		if ($_POST['approve_and_close']) {
+		?>
+		<script type="text/javascript">
+		setTimeout(function() {window.close();}, 2500);
+		window.close();
+		</script>
+		<?php
+		}
+
+	}
+
 } else
 	echo "You are not authorised to approve or reject a recipe.";
