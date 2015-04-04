@@ -51,9 +51,11 @@ function refresh($src) {
 	return $out;
 }
 
+$done_marker = "Operation finished.";
+
 function upload($src) {
 	global $recipedir, $source, $recipegit, $program, $version;
-	global $submitter, $submitteremail, $origin, $logfile;
+	global $submitter, $submitteremail, $origin, $logfile, $done_marker;
 	error_reporting(E_ERROR);
 	if (!authorised()) {
 		return;
@@ -63,6 +65,7 @@ function upload($src) {
 	$logfile = "$pwd/$recipedir/$source/upload_log";
 	system("rm -f $logfile &> /dev/null");
 	chdir("$recipegit/trunk");
+	log_echo("Resynchronizing local git repository...<br/>");
 	log_system("git pull");
 	if (!file_exists("$program")) {
 		log_echo("This is a new program, creating directory...<br />");
@@ -81,6 +84,7 @@ function upload($src) {
 			"since this version was submitted. It will not be possible\n" .
 			"to commit this recipe. It must be submitted again based\n" .
 			"on the entry in trunk.");
+			log_echo($done_marker);
 			return;
 		}
 		log_system("cp -Rf $pwd/$recipedir/$source/$program/$version .");
@@ -88,7 +92,6 @@ function upload($src) {
 	}
 	
 	chdir("$recipegit/revisions");
-	log_system("git pull");
 	if (!file_exists("$program")) {
 		log_echo("Creating revisions/$program directory...<br />\n");
 		log_system("mkdir $program");
@@ -125,7 +128,8 @@ function upload($src) {
 		escapeshellarg("$submitter <$submitteremail>"));
 
 	log_system("git push");
-	log_echo("Committed recipe to store.<br/>");
+	log_echo("Committed recipe to store!<br>");
+	log_echo($done_marker);
 }
 
 sajax_init();
@@ -224,7 +228,6 @@ sajax_show_javascript();
 
 var old_data = "";
 var dots = 3;
-var uploadDone = false;
 var statusObj = document.getElementById("status");
 
 function refresh_cb(new_data) {
@@ -232,20 +235,20 @@ function refresh_cb(new_data) {
 		document.getElementById("log").innerHTML = new_data;
 		old_data = new_data;
 	}
-	if (!uploadDone) {
+	if (new_data.indexOf("<?php echo $done_marker; ?>") == -1) {
 		statusObj.innerHTML = "Uploading" + (dots == 1 ? "." : (dots == 2 ? ".." : "..."));
 		dots++;
 		if (dots == 4) {
 			dots = 1;
 		}
 		setTimeout('x_refresh("<?php echo $source; ?>", refresh_cb)', 1000);
+	} else {
+		statusObj.innerHTML = "Uploaded!";
 	}
 }
 
-function upload_cb() {
-	statusObj.innerHTML = "Uploaded!";
-	uploadDone = true;
-}
+function upload_cb() {}
+
 refresh_cb("");
 x_upload("<?php echo $source; ?>", upload_cb);
 </script>
