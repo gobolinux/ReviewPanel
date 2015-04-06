@@ -23,7 +23,7 @@ if ($_GET['skipemails'])
 	$skipemails = $_GET['skipemails'];
 while (false !== ($entry = $submissiondir->read())) {
 	if (substr($entry, 0, 1) == '.') continue;
-	if ($entry == 'old') continue;	
+	if ($entry == 'old' || ! is_dir("$recipedir/$entry")) continue;	
 	$s = dir("$recipedir/$entry");
 	while (false !== ($subdir = $s->read())) {
 		if (substr($subdir, 0, 1) == '.') continue;
